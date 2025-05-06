@@ -12,6 +12,7 @@
   - Message display with user/AI distinction
   - Message input and submission
   - Chat history display
+  - Model selection dropdown for choosing different LLM models
 - ✅ **Document Management**: Basic document management functionality
   - Document creation with title
   - Document selection from list
@@ -27,10 +28,12 @@
   - Document version history
   - Chat history retrieval
   - Chat message processing
-- ✅ **AI Integration**: Basic AI assistant functionality
+- ✅ **AI Integration**: Advanced AI assistant functionality
   - Document analysis for suggestions
   - Chat message processing
   - LangChain and LangGraph integration
+  - Real LLM integration via OpenRouter API
+  - Support for multiple LLM models (Claude, GPT-4.1)
 - ✅ **Data Storage**: In-memory storage for documents and chat history
   - Document storage with versioning
   - Chat history storage by document
@@ -76,25 +79,26 @@
 
 The project is in the **early development stage** with the following components implemented:
 
-1. **Core Frontend Components**: The main UI components are in place, including the document editor, chat panel, and document list.
+1. **Core Frontend Components**: The main UI components are in place, including the document editor, chat panel with model selection, and document list.
 2. **Basic Backend API**: The backend API is functional with endpoints for document and chat operations.
-3. **AI Integration**: Basic AI assistant functionality is implemented with mock responses.
+3. **AI Integration**: Advanced AI assistant functionality is implemented with real LLM integration via OpenRouter API.
 
 The application can currently:
 - Create and edit documents with rich text formatting
 - Save documents to the backend (in-memory storage)
-- Chat with the AI assistant
-- Receive basic AI suggestions for document improvements
+- Chat with the AI assistant using different LLM models
+- Receive AI-generated suggestions for document improvements
 
 ## Known Issues
 
 1. **Data Persistence**: All data is stored in memory and is lost when the server restarts
-2. **AI Limitations**: The AI assistant currently uses mock responses instead of a real language model
+2. **API Key Management**: OpenRouter API key needs to be manually configured in the .env file
 3. **No Real-time Updates**: Changes made by one user are not immediately visible to others
 4. **No Authentication**: There is no user authentication or authorization system
 5. **Limited Error Handling**: Error handling is minimal and could be improved
 6. **Performance Concerns**: Large documents may cause performance issues
 7. **No Offline Support**: The application requires a constant connection to the backend
+8. **LLM Rate Limits**: Potential rate limiting issues with the OpenRouter API
 
 ## Evolution of Project Decisions
 
@@ -108,10 +112,13 @@ The application can currently:
 - Added React Query for data fetching and caching to improve state management
 - Implemented document versioning to track changes
 - Structured the AI assistant with LangGraph for better workflow management
+- Integrated real LLM models via OpenRouter API
+- Added model selection capability to the chat interface
 - Designed the API with future database integration in mind
 
 ### Future Considerations
 - May need to implement Operational Transformation or CRDT for conflict-free real-time collaboration
 - Considering WebSocket vs. Server-Sent Events for real-time updates
 - Evaluating different database options (PostgreSQL, MongoDB) for persistent storage
-- Exploring options for more advanced AI integration with fine-tuned models
+- Exploring additional LLM models to add to the selection dropdown
+- Considering caching mechanisms for LLM responses to improve performance and reduce API costs

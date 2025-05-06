@@ -42,8 +42,8 @@ export const getChatHistory = async (documentId: string): Promise<ChatMessage[]>
   return response.data;
 };
 
-export const sendChatMessage = async (documentId: string, content: string): Promise<AIResponse> => {
-  const response = await api.post(`/documents/${documentId}/chat`, { content });
+export const sendChatMessage = async (documentId: string, content: string, model?: string): Promise<AIResponse> => {
+  const response = await api.post(`/documents/${documentId}/chat`, { content, model });
   return response.data;
 };
 

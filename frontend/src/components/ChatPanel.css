@@ -23,12 +23,41 @@
   padding: 1rem;
   border-bottom: 1px solid #e0e0e0;
   background-color: #f1f1f1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
-.chat-header h2 {
+.chat-header-title h2 {
   margin: 0;
   font-size: 1.2rem;
   color: #2c3e50;
+}
+
+.model-selector-container {
+  display: flex;
+  align-items: center;
+}
+
+.model-selector {
+  padding: 0.5rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background-color: white;
+  font-size: 0.85rem;
+  color: #2c3e50;
+  cursor: pointer;
+  outline: none;
+}
+
+.model-selector:hover {
+  border-color: #3498db;
+}
+
+.model-selector:disabled {
+  background-color: #f1f1f1;
+  cursor: not-allowed;
+  opacity: 0.7;
 }
 
 .chat-messages {

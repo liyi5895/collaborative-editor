@@ -51,6 +51,7 @@ class ChatMessage(BaseModel):
 
 class ChatMessageCreate(BaseModel):
     content: str
+    model: Optional[str] = None
 
 class AIResponse(BaseModel):
     message: str
@@ -151,10 +152,15 @@ async def create_chat_message(document_id: str, message: ChatMessageCreate):
         for msg in chat_history[document_id]
     ]
     
+    # Get the model from the request or use the default
+    from app.ai_assistant import DEFAULT_MODEL
+    model = message.model or DEFAULT_MODEL
+    
     ai_response = process_query(
         document_content=document_content,
         chat_history=chat_messages,
-        query=message.content
+        query=message.content,
+        model=model
     )
     
     # Add AI response to chat history

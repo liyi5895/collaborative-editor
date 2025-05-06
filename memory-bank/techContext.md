@@ -15,8 +15,10 @@
 - **FastAPI**: Modern, high-performance web framework for building APIs
 - **LangChain**: Framework for developing applications powered by language models
 - **LangGraph**: Framework for building stateful, multi-step workflows with LLMs
+- **OpenRouter API**: API gateway for accessing various LLM models
 - **Pydantic**: Data validation and settings management using Python type annotations
 - **Uvicorn**: ASGI server for running the FastAPI application
+- **python-dotenv**: Library for loading environment variables from .env files
 
 ### Development Tools
 - **Node.js**: JavaScript runtime for frontend development
@@ -45,7 +47,8 @@
    - On Windows: `venv\Scripts\activate`
    - On macOS/Linux: `source venv/bin/activate`
 4. Install dependencies: `pip install -r requirements.txt`
-5. Run the server: `python run.py`
+5. Configure the OpenRouter API key in the `.env` file
+6. Run the server: `python run.py`
 
 ### Docker Setup
 1. From the project root, run `docker-compose up`
@@ -67,9 +70,11 @@
 3. **Data Storage**: Currently uses in-memory storage, which means data is lost when the server restarts
 
 ### AI Integration
-1. **Model Limitations**: The AI assistant uses mock responses in the current implementation
-2. **Response Time**: AI processing may introduce latency in the chat interface
-3. **Suggestion Quality**: The quality of AI suggestions depends on the underlying model and prompt engineering
+1. **LLM Integration**: The AI assistant uses real LLM models via OpenRouter API
+2. **Model Selection**: Users can select different LLM models from a dropdown menu
+3. **Response Time**: AI processing may introduce latency in the chat interface
+4. **API Key Management**: Requires an OpenRouter API key to be set in the `.env` file
+5. **Suggestion Quality**: The quality of AI suggestions depends on the selected model and prompt engineering
 
 ## Dependencies
 
@@ -87,6 +92,8 @@
 - **pydantic**: Data validation
 - **langchain**: LLM application framework
 - **langgraph**: Workflow management for LLMs
+- **requests**: HTTP library for making API calls
+- **python-dotenv**: Environment variable management
 
 ## API Structure
 
@@ -100,6 +107,7 @@
 ### Chat Endpoints
 - `GET /documents/{document_id}/chat`: Get chat history for a document
 - `POST /documents/{document_id}/chat`: Send a message and get AI response
+  - Optional `model` parameter to specify which LLM model to use
 
 ## Data Models
 
@@ -133,6 +141,14 @@ interface ChatMessage {
 }
 ```
 
+### Chat Message Create
+```typescript
+interface ChatMessageCreate {
+  content: string;
+  model?: string; // Optional model parameter
+}
+```
+
 ### AI Suggestion
 ```typescript
 interface Suggestion {
@@ -161,3 +177,11 @@ interface Suggestion {
 - State management for AI assistant conversations
 - Document content analysis for generating suggestions
 - Structured output parsing for AI responses
+- Integration with OpenRouter API for accessing real LLM models
+- Support for multiple LLM models
+
+### OpenRouter API
+- API gateway for accessing various LLM models
+- Support for Claude 3.7 Sonnet and GPT-4.1 models
+- JSON response format for structured AI responses
+- System and user message formatting

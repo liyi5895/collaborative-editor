@@ -4,6 +4,15 @@ import { getChatHistory, sendChatMessage } from '../services/api';
 import { ChatMessage, Suggestion } from '../types';
 import './ChatPanel.css';
 
+// Available LLM models
+const AVAILABLE_MODELS = [
+  { id: "claude-3.7-sonnet", name: "Claude 3.7 Sonnet" },
+  { id: "gpt-4o-mini", name: "GPT 4o Mini" }
+];
+
+// Default model
+const DEFAULT_MODEL = "claude-3-7-sonnet-20250219";
+
 interface ChatPanelProps {
   documentId?: string;
   isCreatingNew?: boolean;
@@ -11,6 +20,7 @@ interface ChatPanelProps {
 
 const ChatPanel: React.FC<ChatPanelProps> = ({ documentId, isCreatingNew = false }) => {
   const [message, setMessage] = useState<string>('');
+  const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
@@ -27,8 +37,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ documentId, isCreatingNew = false
 
   // Mutation for sending messages
   const sendMessageMutation = useMutation({
-    mutationFn: ({ documentId, content }: { documentId: string; content: string }) => 
-      sendChatMessage(documentId, content),
+    mutationFn: ({ documentId, content, model }: { documentId: string; content: string; model: string }) => 
+      sendChatMessage(documentId, content, model),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['chatHistory', documentId] });
     },
@@ -70,7 +80,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ documentId, isCreatingNew = false
       setMessage('');
     } else if (documentId) {
       // Normal case with an existing document
-      sendMessageMutation.mutate({ documentId, content: message });
+      sendMessageMutation.mutate({ 
+        documentId, 
+        content: message,
+        model: selectedModel
+      });
       setMessage('');
     }
   };
@@ -96,7 +110,23 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ documentId, isCreatingNew = false
   return (
     <div className="chat-panel">
       <div className="chat-header">
-        <h2>AI Assistant</h2>
+        <div className="chat-header-title">
+          <h2>AI Assistant</h2>
+        </div>
+        <div className="model-selector-container">
+          <select
+            className="model-selector"
+            value={selectedModel}
+            onChange={(e) => setSelectedModel(e.target.value)}
+            disabled={sendMessageMutation.isLoading}
+          >
+            {AVAILABLE_MODELS.map((model) => (
+              <option key={model.id} value={model.id}>
+                {model.name}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
       
       <div className="chat-messages">

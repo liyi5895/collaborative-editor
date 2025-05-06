@@ -7,6 +7,23 @@ from typing import List, Dict, Any, Optional
 from langgraph.graph import StateGraph, END
 import os
 import json
+import requests
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Get OpenRouter API key from environment variables
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+
+# Available models
+AVAILABLE_MODELS = {
+    "claude-3.7-sonnet": "anthropic/claude-3.7-sonnet",
+    "gpt-4o-mini": "openai/gpt-4o-mini"
+}
+
+# Default model
+DEFAULT_MODEL = "claude-3.7-sonnet"
 
 # Define the state for the LangGraph
 class DocumentAssistantState(BaseModel):
@@ -27,12 +44,88 @@ class AIAssistantResponse(BaseModel):
     message: str = Field(description="The AI assistant's response to the user's query")
     suggestions: List[DocumentSuggestion] = Field(description="List of suggested changes to the document")
 
+def call_openrouter_api(prompt: str, model: str = DEFAULT_MODEL) -> Dict[str, Any]:
+    """
+    Call the OpenRouter API to get a response from the specified LLM model.
+    
+    Args:
+        prompt: The prompt to send to the LLM
+        model: The model to use (default: DEFAULT_MODEL)
+    
+    Returns:
+        Dict containing the LLM response
+    """
+    if not OPENROUTER_API_KEY:
+        raise ValueError("OpenRouter API key not found. Please set the OPENROUTER_API_KEY environment variable.")
+    
+    # Get the full model identifier from the available models
+    model_id = AVAILABLE_MODELS.get(model, AVAILABLE_MODELS[DEFAULT_MODEL])
+    
+    # Prepare the API request
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    
+    data = {
+        "model": model_id,
+        "messages": [
+            {
+                "role": "system",
+                "content": """You are an AI assistant helping with a document. 
+                Analyze the document content and provide helpful responses.
+                Also suggest changes to improve the document.
+                Your response should be in JSON format with a 'message' field and a 'suggestions' field.
+                Each suggestion should have a 'type' (addition, deletion, or modification),
+                'content' (the text to add, delete, or use as replacement),
+                'position' (where in the document to apply the change), and
+                'reason' (why you're suggesting this change)."""
+            },
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        "response_format": {"type": "json_object"}
+    }
+    
+    try:
+        response = requests.post(
+            url="https://openrouter.ai/api/v1/chat/completions",
+            headers=headers,
+            json=data
+        )
+        response.raise_for_status()
+        
+        result = response.json()
+        
+        # Extract the content from the response
+        if "choices" in result and len(result["choices"]) > 0:
+            content = result["choices"][0]["message"]["content"]
+            # Parse the JSON content
+            try:
+                return json.loads(content)
+            except json.JSONDecodeError:
+                # If the response is not valid JSON, create a fallback response
+                return {
+                    "message": content,
+                    "suggestions": []
+                }
+        else:
+            return {
+                "message": "I'm sorry, I couldn't process your request.",
+                "suggestions": []
+            }
+    except Exception as e:
+        print(f"Error calling OpenRouter API: {str(e)}")
+        return {
+            "message": f"I'm sorry, there was an error processing your request: {str(e)}",
+            "suggestions": []
+        }
+
 # Create a function to generate AI responses
 def generate_response(state: DocumentAssistantState):
     """Generate a response from the AI assistant based on the document content and user query."""
-    # In a production environment, this would use a real LLM
-    # For now, we'll use a placeholder implementation
-    
     # Format the chat history for context
     formatted_history = ""
     for message in state.chat_history:
@@ -40,53 +133,30 @@ def generate_response(state: DocumentAssistantState):
         content = message.get("content", "")
         formatted_history += f"{role.upper()}: {content}\n"
     
-    # Create a prompt template
-    prompt = ChatPromptTemplate.from_template(
-        """You are an AI assistant helping with a document.
-        
+    # Create the prompt for the LLM
+    prompt = f"""
         DOCUMENT CONTENT:
-        {document_content}
-        
+        {state.document_content}
+
         CHAT HISTORY:
-        {chat_history}
-        
+        {formatted_history}
+
         USER QUERY:
-        {current_query}
-        
+        {state.current_query}
+
         Based on the document content and the user's query, provide a helpful response.
         Also suggest any changes to the document that might improve it.
-        
-        Your response should be in JSON format with a 'message' field and a 'suggestions' field.
-        Each suggestion should have a 'type' (addition, deletion, or modification),
-        'content' (the text to add, delete, or use as replacement),
-        'position' (where in the document to apply the change), and
-        'reason' (why you're suggesting this change).
-        """
-    )
+    """
     
-    # For demonstration purposes, we'll create a mock response
-    # In a real implementation, this would call an LLM
-    mock_response = {
-        "message": f"I've analyzed your document and your query: '{state.current_query}'",
-        "suggestions": [
-            {
-                "type": "addition",
-                "content": "This is a suggested addition to your document.",
-                "position": 0,
-                "reason": "Adding an introduction would make the document clearer."
-            },
-            {
-                "type": "modification",
-                "content": "This is a suggested modification.",
-                "position": len(state.document_content) // 2,
-                "reason": "This change would improve the clarity of your main point."
-            }
-        ]
-    }
+    # Get the model from the state if available, otherwise use the default
+    model = getattr(state, "model", DEFAULT_MODEL)
+    
+    # Call the OpenRouter API
+    llm_response = call_openrouter_api(prompt, model)
     
     # Update the state with the response and suggestions
-    state.response = mock_response["message"]
-    state.suggestions = mock_response["suggestions"]
+    state.response = llm_response.get("message", "I'm sorry, I couldn't process your request.")
+    state.suggestions = llm_response.get("suggestions", [])
     
     return state
 
@@ -109,13 +179,25 @@ def create_document_assistant_graph():
     return workflow.compile()
 
 # Function to process a user query
-def process_query(document_content: str, chat_history: List[Dict[str, Any]], query: str) -> Dict[str, Any]:
-    """Process a user query and return an AI response with suggestions."""
+def process_query(document_content: str, chat_history: List[Dict[str, Any]], query: str, model: str = DEFAULT_MODEL) -> Dict[str, Any]:
+    """
+    Process a user query and return an AI response with suggestions.
+    
+    Args:
+        document_content: The content of the document
+        chat_history: The chat history
+        query: The user's query
+        model: The LLM model to use (default: DEFAULT_MODEL)
+    
+    Returns:
+        Dict containing the AI response and suggestions
+    """
     # Create the initial state
     state = DocumentAssistantState(
         document_content=document_content,
         chat_history=chat_history,
-        current_query=query
+        current_query=query,
+        model=model  # Add the model to the state
     )
     
     # Create the graph
@@ -123,10 +205,6 @@ def process_query(document_content: str, chat_history: List[Dict[str, Any]], que
     
     # Run the graph
     result = graph.invoke(state)
-    
-    # Based on LangGraph documentation, result should be a dictionary
-    # For debugging
-    print(f"LangGraph result type: {type(result)}")
     
     # Extract the final state from the result dictionary
     # The key should be the name of the last node executed, which is 'generate_response'
