@@ -1,0 +1,280 @@
+.document-editor {
+  display: flex;
+  flex-direction: column;
+  width: 65%;
+  height: 100%;
+  border-right: 1px solid #e0e0e0;
+  background-color: #fff;
+}
+
+.editor-header {
+  display: flex;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.back-button {
+  background: none;
+  border: none;
+  color: #3498db;
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 0.5rem;
+  margin-right: 1rem;
+}
+
+.document-title {
+  margin: 0;
+  flex: 1;
+  font-size: 1.5rem;
+  color: #2c3e50;
+}
+
+.document-title-input {
+  flex: 1;
+  font-size: 1.2rem;
+  padding: 0.5rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  margin-right: 1rem;
+}
+
+.save-button {
+  background-color: #2ecc71;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.save-button:disabled {
+  background-color: #95a5a6;
+  cursor: not-allowed;
+}
+
+.editor-toolbar {
+  display: flex;
+  padding: 0.5rem;
+  border-bottom: 1px solid #e0e0e0;
+  background-color: #f8f9fa;
+}
+
+.editor-toolbar button {
+  background: none;
+  border: 1px solid #e0e0e0;
+  margin-right: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.editor-toolbar button:hover {
+  background-color: #f1f1f1;
+}
+
+.editor-toolbar button.active {
+  background-color: #e0e0e0;
+  font-weight: bold;
+}
+
+.toolbar-divider {
+  margin: 0 0.5rem;
+  color: #e0e0e0;
+}
+
+.editor-content {
+  flex: 1;
+  padding: 1rem;
+  overflow-y: auto;
+}
+
+/* Slate editor styles */
+.editor-content [data-slate-editor] {
+  min-height: 100%;
+  padding: 0.5rem;
+  line-height: 1.5;
+}
+
+.editor-content [data-slate-editor] > * {
+  margin-bottom: 1rem;
+}
+
+.editor-content [data-slate-editor] h1 {
+  font-size: 1.8rem;
+  font-weight: bold;
+  margin-top: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.editor-content [data-slate-editor] h2 {
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin-top: 1.2rem;
+  margin-bottom: 0.8rem;
+}
+
+.editor-content [data-slate-editor] h3 {
+  font-size: 1.2rem;
+  font-weight: bold;
+  margin-top: 1rem;
+  margin-bottom: 0.6rem;
+}
+
+.editor-content [data-slate-editor] ul,
+.editor-content [data-slate-editor] ol {
+  margin-left: 2rem;
+  margin-bottom: 1rem;
+}
+
+.editor-content [data-slate-editor] li {
+  margin-bottom: 0.5rem;
+}
+
+.editor-content [data-slate-editor] code {
+  background-color: #f1f1f1;
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+  font-family: monospace;
+}
+
+/* Suggestion styles */
+.suggestion-addition {
+  background-color: rgba(46, 204, 113, 0.2);
+  text-decoration: none;
+}
+
+.suggestion-deletion {
+  background-color: rgba(231, 76, 60, 0.2);
+  text-decoration: line-through;
+}
+
+.suggestion-modification {
+  background-color: rgba(52, 152, 219, 0.2);
+  text-decoration: none;
+}
+
+.suggestions-panel {
+  border-top: 1px solid #e0e0e0;
+  padding: 1rem;
+  max-height: 30%;
+  overflow-y: auto;
+}
+
+.suggestions-panel h3 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  color: #2c3e50;
+}
+
+.suggestions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.suggestion-item {
+  display: flex;
+  justify-content: space-between;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 0.75rem;
+}
+
+.suggestion-content {
+  flex: 1;
+}
+
+.suggestion-type {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: 3px;
+  font-size: 0.8rem;
+  font-weight: bold;
+  margin-bottom: 0.5rem;
+}
+
+.suggestion-type-addition {
+  background-color: #2ecc71;
+  color: white;
+}
+
+.suggestion-type-deletion {
+  background-color: #e74c3c;
+  color: white;
+}
+
+.suggestion-type-modification {
+  background-color: #3498db;
+  color: white;
+}
+
+.suggestion-reason {
+  font-style: italic;
+  color: #7f8c8d;
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+}
+
+.suggestion-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-left: 1rem;
+}
+
+.accept-button {
+  background-color: #2ecc71;
+  color: white;
+  border: none;
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.reject-button {
+  background-color: #e74c3c;
+  color: white;
+  border: none;
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.auto-save-indicator {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+/* Responsive styles */
+@media (max-width: 768px) {
+  .document-editor {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid #e0e0e0;
+  }
+  
+  .editor-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .document-title-input {
+    width: 100%;
+    margin-right: 0;
+    margin-bottom: 0.5rem;
+  }
+  
+  .editor-toolbar {
+    flex-wrap: wrap;
+  }
+}
