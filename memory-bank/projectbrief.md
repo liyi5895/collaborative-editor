@@ -1,0 +1,1 @@
+A full-stack collaborative document editor with real-time editing and AI assistance. This application allows users to create and edit documents, receive AI-powered suggestions, and interact with an AI assistant through a chat interface.
