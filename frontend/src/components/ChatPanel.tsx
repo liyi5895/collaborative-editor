@@ -11,7 +11,7 @@ const AVAILABLE_MODELS = [
 ];
 
 // Default model
-const DEFAULT_MODEL = "claude-3-7-sonnet-20250219";
+const DEFAULT_MODEL = "claude-3.7-sonnet";
 
 interface ChatPanelProps {
   documentId?: string;
@@ -38,39 +38,134 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ documentId, isCreatingNew = false
 
   // Mutation for sending messages
   const sendMessageMutation = useMutation({
-    mutationFn: ({ documentId, content, model }: { documentId: string; content: string; model: string }) => 
-      sendChatMessage(documentId, content, model),
-    onSuccess: (data, variables) => {
+    mutationFn: ({ documentId, content, model }: { documentId: string; content: string; model: string }) => {
+      console.log("Sending chat message with model:", model);
+      return sendChatMessage(documentId, content, model);
+    },
+    onSuccess: (data: any, variables) => {
       console.log("Received AI response:", data);
       
-      // Add user message to chat history first
+      // Ensure data is in the expected format
+      let message = "Sorry, I couldn't process your request.";
+      let suggestions: Suggestion[] = [];
+      
+      try {
+        // Check if data is a string (raw JSON)
+        if (typeof data === 'string') {
+          console.log("Data is a string, attempting to parse:", data);
+          
+          // Try to extract JSON from markdown code blocks
+          let contentToParse: string = data;
+          const markdownMatch = data.match(/```(?:json)?\s*([\s\S]*?)```/);
+          if (markdownMatch && markdownMatch[1]) {
+            console.log("Detected markdown code block, extracting content");
+            contentToParse = markdownMatch[1].trim();
+            console.log("Extracted content:", contentToParse);
+          }
+          
+          try {
+            const parsedData = JSON.parse(contentToParse);
+            message = parsedData.message || message;
+            suggestions = parsedData.suggestions || [];
+          } catch (e) {
+            console.error("Failed to parse data as JSON:", e);
+            
+            // If we can't parse as JSON, try to extract message using regex
+            if (typeof contentToParse === 'string' && 
+                contentToParse.includes('"message"') && 
+                contentToParse.includes('"suggestions"')) {
+              console.log("Attempting to extract message using regex");
+              const messageMatch = contentToParse.match(/"message"\s*:\s*"([^"]+)"/);
+              if (messageMatch && messageMatch[1]) {
+                message = messageMatch[1];
+                console.log("Extracted message:", message);
+              } else {
+                message = "Sorry, I couldn't process your request properly.";
+              }
+            } else {
+              message = typeof contentToParse === 'string' ? contentToParse : "Sorry, I couldn't process your request properly.";
+            }
+          }
+        } else {
+          // Data is already an object
+          console.log("Data is an object");
+          console.log("AI message:", data.message);
+          console.log("AI suggestions:", data.suggestions);
+          
+          message = data.message || message;
+          suggestions = data.suggestions || [];
+        }
+        
+        // Add user message to chat history first
+        if (documentId) {
+          // Get current chat history
+          const currentHistory = queryClient.getQueryData<ChatMessage[]>(['chatHistory', documentId]) || [];
+          
+          // Add user message to chat history
+          const userMessage: ChatMessage = {
+            content: variables.content, // Use the content from variables
+            role: 'user',
+            timestamp: new Date().toISOString()
+          };
+          
+          // Add AI message to chat history
+          const aiMessage: ChatMessage = {
+            content: message,
+            role: 'ai',
+            timestamp: new Date().toISOString()
+          };
+          
+          // Update chat history with both messages
+          queryClient.setQueryData(['chatHistory', documentId], [...currentHistory, userMessage, aiMessage]);
+        }
+        
+        // Pass suggestions to parent component
+        if (onNewSuggestions && suggestions.length > 0) {
+          console.log("Passing suggestions to parent:", suggestions);
+          onNewSuggestions(suggestions);
+        }
+      } catch (error) {
+        console.error("Error processing AI response:", error);
+        
+        // Add error message to chat history
+        if (documentId) {
+          const currentHistory = queryClient.getQueryData<ChatMessage[]>(['chatHistory', documentId]) || [];
+          
+          // Add user message to chat history
+          const userMessage: ChatMessage = {
+            content: variables.content,
+            role: 'user',
+            timestamp: new Date().toISOString()
+          };
+          
+          // Add error message to chat history
+          const errorMessage: ChatMessage = {
+            content: "Sorry, there was an error processing your request.",
+            role: 'ai',
+            timestamp: new Date().toISOString()
+          };
+          
+          queryClient.setQueryData(['chatHistory', documentId], [...currentHistory, userMessage, errorMessage]);
+        }
+      }
+    },
+    onError: (error) => {
+      console.error("Error sending message:", error);
+      
+      // Add error message to chat history
       if (documentId) {
-        // Get current chat history
         const currentHistory = queryClient.getQueryData<ChatMessage[]>(['chatHistory', documentId]) || [];
         
-        // Add user message to chat history
-        const userMessage: ChatMessage = {
-          content: variables.content, // Use the content from variables
-          role: 'user',
-          timestamp: new Date().toISOString()
-        };
-        
-        // Add AI message to chat history
-        const aiMessage: ChatMessage = {
-          content: data.message,
+        // Add error message to chat history
+        const errorMessage: ChatMessage = {
+          content: "Sorry, there was an error sending your message. Please try again.",
           role: 'ai',
           timestamp: new Date().toISOString()
         };
         
-        // Update chat history with both messages
-        queryClient.setQueryData(['chatHistory', documentId], [...currentHistory, userMessage, aiMessage]);
+        queryClient.setQueryData(['chatHistory', documentId], [...currentHistory, errorMessage]);
       }
-      
-      // Pass suggestions to parent component
-      if (onNewSuggestions && data.suggestions) {
-        onNewSuggestions(data.suggestions);
-      }
-    },
+    }
   });
 
   // Scroll to bottom of chat when messages change

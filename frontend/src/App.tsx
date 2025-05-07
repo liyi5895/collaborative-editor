@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import DocumentEditor from './components/DocumentEditor';
+import DocumentEditor from './components/DocumentEditor/index';
 import ChatPanel from './components/ChatPanel';
 import DocumentList from './components/DocumentList';
 import { Document, Suggestion } from './types';

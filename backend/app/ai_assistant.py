@@ -106,13 +106,47 @@ def call_openrouter_api(prompt: str, model: str = DEFAULT_MODEL) -> Dict[str, An
         # Extract the content from the response
         if "choices" in result and len(result["choices"]) > 0:
             content = result["choices"][0]["message"]["content"]
+            
+            # Strip markdown code block formatting if present
+            content_to_parse = content
+            if content.startswith("```") and "```" in content[3:]:
+                print("Detected markdown code block, attempting to strip formatting")
+                # Find the end of the opening backticks
+                start_idx = content.find("\n", 3) + 1
+                # Find the closing backticks
+                end_idx = content.rfind("```")
+                if start_idx > 0 and end_idx > start_idx:
+                    content_to_parse = content[start_idx:end_idx].strip()
+                    print(f"Stripped content: {content_to_parse}")
+            
             # Parse the JSON content
             try:
-                return json.loads(content)
-            except json.JSONDecodeError:
+                print(f"Parsing OpenRouter API response content: {content_to_parse}")
+                parsed_content = json.loads(content_to_parse)
+                print(f"Parsed content: {parsed_content}")
+                return parsed_content
+            except json.JSONDecodeError as e:
                 # If the response is not valid JSON, create a fallback response
+                print(f"JSON decode error: {e}")
+                print(f"Raw content: {content}")
+                
+                # Try to extract message from the content if it's markdown-formatted
+                if "message" in content and "suggestions" in content:
+                    try:
+                        # Simple extraction of message value using string manipulation
+                        message_start = content.find('"message"') + 10  # 10 = len('"message":')
+                        message_start = content.find('"', message_start) + 1
+                        message_end = content.find('"', message_start)
+                        extracted_message = content[message_start:message_end]
+                        return {
+                            "message": extracted_message,
+                            "suggestions": []
+                        }
+                    except Exception as ex:
+                        print(f"Error extracting message: {ex}")
+                
                 return {
-                    "message": content,
+                    "message": "I'm sorry, I couldn't process your request properly. Please try again.",
                     "suggestions": []
                 }
         else:
@@ -225,12 +259,15 @@ def process_query(document_content: str, chat_history: List[Dict[str, Any]], que
     # Extract the final state from the result dictionary
     # The key should be the name of the last node executed, which is 'generate_response'
     try:
-        return {
+        response = {
             "message": result["response"],
             "suggestions": result["suggestions"]
         }
-    except:
+        print(f"Returning AI response: {response}")
+        return response
+    except Exception as e:
         # Fallback in case the result structure is different
+        print(f"Error extracting result: {e}")
         print(f"Unexpected result structure: {result}")
         return {
             "message": "I'm sorry, I couldn't process your request.",
