@@ -20,9 +20,9 @@ export interface ChatMessage {
 }
 
 export interface Suggestion {
-  type: string; // "addition", "deletion", or "modification"
+  type: string; // "addition", "deletion", "modification", or "replace_all"
+  block_index?: number; // Optional because replace_all doesn't need it
   content: string;
-  position: number;
   reason?: string;
 }
 

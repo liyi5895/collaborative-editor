@@ -35,9 +35,9 @@ class DocumentAssistantState(BaseModel):
 
 # Define the output schema for the AI suggestions
 class DocumentSuggestion(BaseModel):
-    type: str = Field(description="Type of suggestion: 'addition', 'deletion', or 'modification'")
+    type: str = Field(description="Type of suggestion: 'addition', 'deletion', 'modification', or 'replace_all'")
+    block_index: Optional[int] = Field(description="The index of the block to modify (0-based)", default=None)
     content: str = Field(description="The content to be added, deleted, or used as replacement")
-    position: int = Field(description="The position in the document where this suggestion applies")
     reason: str = Field(description="Explanation for why this suggestion is being made")
 
 class AIAssistantResponse(BaseModel):
@@ -76,10 +76,14 @@ def call_openrouter_api(prompt: str, model: str = DEFAULT_MODEL) -> Dict[str, An
                 Analyze the document content and provide helpful responses.
                 Also suggest changes to improve the document.
                 Your response should be in JSON format with a 'message' field and a 'suggestions' field.
-                Each suggestion should have a 'type' (addition, deletion, or modification),
-                'content' (the text to add, delete, or use as replacement),
-                'position' (where in the document to apply the change), and
-                'reason' (why you're suggesting this change)."""
+                
+                Each suggestion should have:
+                - 'type': "addition", "deletion", "modification", or "replace_all"
+                - 'block_index': The index of the block to modify (as shown in [])
+                - 'content': The text to add, delete, or use as replacement
+                - 'reason': Why you're suggesting this change
+                
+                For complete document rewrites, use type: "replace_all" instead of a block_index."""
             },
             {
                 "role": "user",
@@ -133,10 +137,14 @@ def generate_response(state: DocumentAssistantState):
         content = message.get("content", "")
         formatted_history += f"{role.upper()}: {content}\n"
     
+    # Format document with block indices
+    document_lines = state.document_content.split('\n')
+    formatted_document = "\n".join([f"[{i}] {line}" for i, line in enumerate(document_lines)])
+    
     # Create the prompt for the LLM
     prompt = f"""
-        DOCUMENT CONTENT:
-        {state.document_content}
+        DOCUMENT CONTENT (with block indices):
+        {formatted_document}
 
         CHAT HISTORY:
         {formatted_history}
@@ -146,6 +154,14 @@ def generate_response(state: DocumentAssistantState):
 
         Based on the document content and the user's query, provide a helpful response.
         Also suggest any changes to the document that might improve it.
+        
+        For any suggested changes, specify:
+        - type: "addition", "deletion", "modification", or "replace_all"
+        - block_index: The index of the block to modify (as shown in [])
+        - content: The text to add, delete, or use as replacement
+        - reason: Why you're suggesting this change
+        
+        For complete document rewrites, use type: "replace_all" instead of a block_index.
     """
     
     # Get the model from the state if available, otherwise use the default

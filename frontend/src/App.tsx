@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import DocumentEditor from './components/DocumentEditor';
 import ChatPanel from './components/ChatPanel';
 import DocumentList from './components/DocumentList';
-import { Document } from './types';
+import { Document, Suggestion } from './types';
 import './App.css';
 
 // Create a client for React Query
@@ -12,6 +12,13 @@ const queryClient = new QueryClient();
 function App() {
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   const [isCreatingNew, setIsCreatingNew] = useState<boolean>(false);
+  const [aiSuggestions, setAiSuggestions] = useState<Suggestion[]>([]);
+
+  // Handler for new suggestions from ChatPanel
+  const handleNewSuggestions = (suggestions: Suggestion[]) => {
+    console.log("App received suggestions:", suggestions);
+    setAiSuggestions(suggestions);
+  };
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -39,6 +46,8 @@ function App() {
               <DocumentEditor 
                 document={selectedDocument} 
                 isCreatingNew={isCreatingNew}
+                suggestions={aiSuggestions}
+                onSuggestionApplied={() => setAiSuggestions([])}
                 onDocumentCreated={(doc) => {
                   setSelectedDocument(doc);
                   setIsCreatingNew(false);
@@ -48,7 +57,11 @@ function App() {
                   setIsCreatingNew(false);
                 }}
               />
-              <ChatPanel documentId={selectedDocument?.id} isCreatingNew={isCreatingNew} />
+              <ChatPanel 
+                documentId={selectedDocument?.id} 
+                isCreatingNew={isCreatingNew}
+                onNewSuggestions={handleNewSuggestions}
+              />
             </div>
           )}
         </main>

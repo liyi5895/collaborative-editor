@@ -27,6 +27,8 @@ import './DocumentEditor.css';
 interface DocumentEditorProps {
   document: Document | null;
   isCreatingNew: boolean;
+  suggestions?: Suggestion[];
+  onSuggestionApplied?: () => void;
   onDocumentCreated: (document: Document) => void;
   onBackToList: () => void;
 }
@@ -116,6 +118,8 @@ const deserialize = (content: string): Descendant[] => {
 const DocumentEditor: React.FC<DocumentEditorProps> = ({ 
   document, 
   isCreatingNew, 
+  suggestions = [],
+  onSuggestionApplied,
   onDocumentCreated, 
   onBackToList 
 }) => {
@@ -131,7 +135,8 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
       },
     ];
   });
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [activeSuggestions, setActiveSuggestions] = useState<Suggestion[]>([]);
+  const [documentReplacementSuggestion, setDocumentReplacementSuggestion] = useState<Suggestion | null>(null);
   const [autoSaveTimer, setAutoSaveTimer] = useState<NodeJS.Timeout | null>(null);
 
   const editor = useMemo(() => withHistory(withReact(createEditor())), []);
@@ -178,6 +183,134 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
       }
     };
   }, [value, document?.id, isCreatingNew]);
+
+  // Function to process suggestions
+  const processSuggestions = (suggestionsToProcess: Suggestion[]) => {
+    console.log("Processing suggestions:", suggestionsToProcess);
+    
+    // Check for document-wide replacement first
+    // Handle both "replace_all" and "replace all" formats
+    const replaceAllSuggestion = suggestionsToProcess.find(
+      s => s.type === 'replace_all' || s.type === 'replace all'
+    );
+    
+    if (replaceAllSuggestion) {
+      console.log("Found document-wide replacement suggestion:", replaceAllSuggestion);
+      setDocumentReplacementSuggestion(replaceAllSuggestion);
+      setActiveSuggestions([]);
+      return;
+    }
+    
+    // Process block-specific suggestions
+    const blockSuggestions = suggestionsToProcess.filter(
+      s => s.type !== 'replace_all' && s.type !== 'replace all'
+    );
+    console.log("Processing block-specific suggestions:", blockSuggestions);
+    setActiveSuggestions(blockSuggestions);
+    highlightSuggestions(blockSuggestions);
+  };
+
+  // Handle incoming suggestions
+  useEffect(() => {
+    if (suggestions && suggestions.length > 0) {
+      console.log("DocumentEditor received suggestions:", suggestions);
+      processSuggestions(suggestions);
+    }
+  }, [suggestions]);
+
+  // Function to highlight suggestions in the document
+  const highlightSuggestions = (suggestionsToHighlight: Suggestion[]) => {
+    // This is a simplified approach - in a real implementation,
+    // you would need to handle more complex document structures
+    suggestionsToHighlight.forEach(suggestion => {
+      try {
+        const { type, block_index, content } = suggestion;
+        
+        // Skip if block_index is not provided
+        if (typeof block_index !== 'number') {
+          console.log("Skipping suggestion without block_index:", suggestion);
+          return;
+        }
+        
+        // Check if the block exists
+        if (block_index >= editor.children.length) {
+          console.error(`Block index ${block_index} is out of range`);
+          return;
+        }
+        
+        // Mark the block with suggestion
+        const path = [block_index];
+        const suggestionId = Math.random().toString(36).substring(2, 9);
+        
+        Transforms.setNodes(
+          editor,
+          { suggestion: { type, id: suggestionId } },
+          { at: path }
+        );
+        
+        console.log(`Highlighted block ${block_index} with suggestion type ${type}`);
+      } catch (error) {
+        console.error("Error highlighting suggestion:", error);
+      }
+    });
+  };
+  
+  // Apply document-wide replacement
+  const applyDocumentReplacementSuggestion = (content: string) => {
+    try {
+      console.log("Applying document-wide replacement");
+      
+      // Parse the content into Slate nodes
+      const newValue = deserialize(content);
+      
+      // Replace the entire editor content
+      Transforms.delete(editor, {
+        at: {
+          anchor: Editor.start(editor, []),
+          focus: Editor.end(editor, []),
+        },
+      });
+      
+      // Insert the new content
+      newValue.forEach((node) => {
+        Transforms.insertNodes(editor, node, { at: [editor.children.length] });
+      });
+      
+      // Update the value state to trigger a re-render
+      setValue(editor.children as Descendant[]);
+      
+      console.log("Document replacement applied successfully");
+      
+      // Clear the document replacement suggestion
+      setDocumentReplacementSuggestion(null);
+      
+      // Notify parent that a suggestion was applied
+      if (onSuggestionApplied) {
+        onSuggestionApplied();
+      }
+    } catch (error) {
+      console.error("Error applying document replacement:", error);
+    }
+  };
+  
+  // Adjust suggestion indices after an addition or deletion
+  const adjustSuggestionIndices = (operation: 'addition' | 'deletion', index: number) => {
+    setActiveSuggestions(prev => 
+      prev.map(s => {
+        if (typeof s.block_index !== 'number') return s;
+        
+        if (operation === 'addition' && s.block_index >= index) {
+          return { ...s, block_index: s.block_index + 1 };
+        }
+        
+        if (operation === 'deletion' && s.block_index > index) {
+          return { ...s, block_index: s.block_index - 1 };
+        }
+        
+        return s;
+      })
+    );
+  };
 
   // Handle saving a new document
   const handleSaveNewDocument = () => {
@@ -310,25 +443,64 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
 
   // Apply AI suggestions to the document
   const applySuggestion = (suggestion: Suggestion) => {
-    const { type, content, position } = suggestion;
+    const { type, block_index, content } = suggestion;
     
-    // This is a simplified implementation
-    // In a real app, you would need to handle more complex cases
-    if (type === 'addition') {
-      // Insert the content at the specified position
-      const point = Editor.point(editor, { path: [0, 0], offset: position });
-      Transforms.insertText(editor, content, { at: point });
-    } else if (type === 'deletion') {
-      // Delete the content at the specified position
-      const start = Editor.point(editor, { path: [0, 0], offset: position });
-      const end = Editor.point(editor, { path: [0, 0], offset: position + content.length });
-      Transforms.delete(editor, { at: { anchor: start, focus: end } });
-    } else if (type === 'modification') {
-      // Replace the content at the specified position
-      const start = Editor.point(editor, { path: [0, 0], offset: position });
-      const end = Editor.point(editor, { path: [0, 0], offset: position + content.length });
-      Transforms.delete(editor, { at: { anchor: start, focus: end } });
-      Transforms.insertText(editor, content, { at: start });
+    try {
+      // Handle document-wide replacement
+      if (type === 'replace_all' || type === 'replace all') {
+        applyDocumentReplacementSuggestion(content);
+        return;
+      }
+      
+      // Skip if block_index is not provided
+      if (typeof block_index !== 'number') {
+        console.error("Block index is required for non-replace_all suggestions");
+        return;
+      }
+      
+      // Check if the block exists
+      if (block_index >= editor.children.length) {
+        console.error(`Block index ${block_index} is out of range`);
+        return;
+      }
+      
+      console.log(`Applying ${type} suggestion to block ${block_index}`);
+      
+      if (type === 'addition') {
+        // Insert a new block at the specified index
+        Transforms.insertNodes(editor, {
+          type: 'paragraph',
+          children: [{ text: content }]
+        }, { at: [block_index] });
+        
+        // Adjust indices of remaining suggestions
+        adjustSuggestionIndices('addition', block_index);
+      } 
+      else if (type === 'deletion') {
+        // Delete the block at the specified index
+        Transforms.removeNodes(editor, { at: [block_index] });
+        
+        // Adjust indices of remaining suggestions
+        adjustSuggestionIndices('deletion', block_index);
+      } 
+      else if (type === 'modification') {
+        // Replace the block at the specified index
+        Transforms.removeNodes(editor, { at: [block_index] });
+        Transforms.insertNodes(editor, {
+          type: 'paragraph',
+          children: [{ text: content }]
+        }, { at: [block_index] });
+      }
+      
+      // Remove the suggestion from the active list
+      setActiveSuggestions(prev => prev.filter(s => s !== suggestion));
+      
+      // Notify parent that a suggestion was applied
+      if (onSuggestionApplied) {
+        onSuggestionApplied();
+      }
+    } catch (error) {
+      console.error("Error applying suggestion:", error);
     }
   };
 
@@ -436,15 +608,42 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
         </Slate>
       </div>
       
-      {suggestions.length > 0 && (
+      {(activeSuggestions.length > 0 || documentReplacementSuggestion) && (
         <div className="suggestions-panel">
           <h3>AI Suggestions</h3>
           <div className="suggestions-list">
-            {suggestions.map((suggestion, index) => (
+            {documentReplacementSuggestion && (
+              <div className="suggestion-item document-replacement">
+                <div className="suggestion-content">
+                  <span className="suggestion-type suggestion-type-addition">
+                    DOCUMENT REPLACEMENT
+                  </span>
+                  <p>The AI suggests replacing the entire document content.</p>
+                  {documentReplacementSuggestion.reason && (
+                    <p className="suggestion-reason">{documentReplacementSuggestion.reason}</p>
+                  )}
+                </div>
+                <div className="suggestion-actions">
+                  <button 
+                    className="accept-button"
+                    onClick={() => applySuggestion(documentReplacementSuggestion)}
+                  >
+                    Accept
+                  </button>
+                  <button 
+                    className="reject-button"
+                    onClick={() => setDocumentReplacementSuggestion(null)}
+                  >
+                    Reject
+                  </button>
+                </div>
+              </div>
+            )}
+            {activeSuggestions.map((suggestion, index) => (
               <div key={index} className="suggestion-item">
                 <div className="suggestion-content">
                   <span className={`suggestion-type suggestion-type-${suggestion.type}`}>
-                    {suggestion.type.toUpperCase()}
+                    {suggestion.type.toUpperCase()} {suggestion.block_index !== undefined ? `(Block ${suggestion.block_index})` : ''}
                   </span>
                   <p>{suggestion.content}</p>
                   {suggestion.reason && (
@@ -461,7 +660,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
                   <button 
                     className="reject-button"
                     onClick={() => {
-                      setSuggestions(suggestions.filter((_, i) => i !== index));
+                      setActiveSuggestions(activeSuggestions.filter((_, i) => i !== index));
                     }}
                   >
                     Reject

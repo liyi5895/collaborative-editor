@@ -16,9 +16,10 @@ const DEFAULT_MODEL = "claude-3-7-sonnet-20250219";
 interface ChatPanelProps {
   documentId?: string;
   isCreatingNew?: boolean;
+  onNewSuggestions?: (suggestions: Suggestion[]) => void;
 }
 
-const ChatPanel: React.FC<ChatPanelProps> = ({ documentId, isCreatingNew = false }) => {
+const ChatPanel: React.FC<ChatPanelProps> = ({ documentId, isCreatingNew = false, onNewSuggestions }) => {
   const [message, setMessage] = useState<string>('');
   const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -39,8 +40,36 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ documentId, isCreatingNew = false
   const sendMessageMutation = useMutation({
     mutationFn: ({ documentId, content, model }: { documentId: string; content: string; model: string }) => 
       sendChatMessage(documentId, content, model),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['chatHistory', documentId] });
+    onSuccess: (data, variables) => {
+      console.log("Received AI response:", data);
+      
+      // Add user message to chat history first
+      if (documentId) {
+        // Get current chat history
+        const currentHistory = queryClient.getQueryData<ChatMessage[]>(['chatHistory', documentId]) || [];
+        
+        // Add user message to chat history
+        const userMessage: ChatMessage = {
+          content: variables.content, // Use the content from variables
+          role: 'user',
+          timestamp: new Date().toISOString()
+        };
+        
+        // Add AI message to chat history
+        const aiMessage: ChatMessage = {
+          content: data.message,
+          role: 'ai',
+          timestamp: new Date().toISOString()
+        };
+        
+        // Update chat history with both messages
+        queryClient.setQueryData(['chatHistory', documentId], [...currentHistory, userMessage, aiMessage]);
+      }
+      
+      // Pass suggestions to parent component
+      if (onNewSuggestions && data.suggestions) {
+        onNewSuggestions(data.suggestions);
+      }
     },
   });
 
@@ -79,13 +108,18 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ documentId, isCreatingNew = false
       queryClient.setQueryData(['chatHistory', 'temp'], [tempMessage, aiResponse]);
       setMessage('');
     } else if (documentId) {
+      // Store the current message before clearing the input
+      const currentMessage = message;
+      
+      // Clear the input field immediately for better UX
+      setMessage('');
+      
       // Normal case with an existing document
       sendMessageMutation.mutate({ 
         documentId, 
-        content: message,
+        content: currentMessage,
         model: selectedModel
       });
-      setMessage('');
     }
   };
 
