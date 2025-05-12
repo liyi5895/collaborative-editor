@@ -135,6 +135,10 @@ The application can currently:
 - Enhanced error handling for different response formats
 - Added support for markdown-formatted JSON responses
 - Implemented proper state updates after editor transformations
+- Fixed AI suggestion application to ensure modifications are applied to the correct blocks
+  - Resolved issue where suggestions were being applied to the wrong block due to mismatch between blockIds and array indices
+  - Implemented robust node finding by blockId instead of relying on array indices
+  - Added detailed logging for better debugging of suggestion application
 
 ### Future Considerations
 - May need to implement Operational Transformation or CRDT for conflict-free real-time collaboration

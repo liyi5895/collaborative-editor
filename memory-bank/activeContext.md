@@ -20,9 +20,13 @@ The Collaborative Editor project is currently focused on implementing the core f
 - **Fixed Chat Panel JSON Display Issue**: Resolved issue with raw JSON being displayed in the chat panel
   - Added markdown code block parsing in both frontend and backend
   - Enhanced error handling for different response formats
-- **Fixed Suggestion Application**: Resolved issue with the "Accept" button not working for suggestions
+- **Fixed Suggestion Application**: Resolved issues with AI suggestions
+  - Fixed the "Accept" button functionality for suggestions
   - Added proper state updates after editor transformations
   - Ensured React re-renders after Slate editor content changes
+  - Fixed critical bug where modification suggestions were applied to the wrong block
+  - Implemented robust node finding by blockId instead of relying on array indices
+  - Added detailed logging for better debugging of suggestion application
 
 ### Backend
 - **Enhanced AI Response Handling**: Improved handling of LLM responses
@@ -100,6 +104,10 @@ The Collaborative Editor project is currently focused on implementing the core f
 - Breaking down large components into smaller pieces improves maintainability and readability
 - Custom hooks are powerful for encapsulating and reusing stateful logic
 - Explicit state updates are necessary when modifying Slate editor content
+- When working with Slate.js, it's critical to handle the potential mismatch between blockIds and array indices
+  - Empty lines and document structure can cause array indices to shift
+  - Always find nodes by their blockId property rather than assuming array indices match blockIds
+  - Use detailed logging to track node positions and properties during operations
 - LangChain and LangGraph provide a structured way to work with language models
 - OpenRouter API simplifies integration with multiple LLM providers
 - React Query simplifies data fetching and caching, reducing the need for manual state management
@@ -114,6 +122,10 @@ The Collaborative Editor project is currently focused on implementing the core f
 - Handling different response formats from various LLM models
 - Debugging issues in complex component hierarchies
 - Ensuring proper state updates in React components with external libraries
+- Maintaining consistent block identification in Slate.js
+  - Handling the mismatch between blockIds and array indices
+  - Dealing with empty lines and document structure changes
+  - Ensuring AI suggestions target the correct blocks
 
 ### Opportunities
 - The AI assistant could be extended to provide more advanced writing assistance
