@@ -12,30 +12,42 @@ The Collaborative Editor project is currently focused on implementing the core f
 ## Recent Changes
 
 ### Frontend
-- Implemented the main App component with React Query integration
-- Created the DocumentEditor component with Slate.js
-- Implemented the ChatPanel component for AI interaction with model selection dropdown
-- Added document list view for managing documents
-- Implemented API service for communication with the backend
-- Updated the ChatPanel styling to accommodate the model selection dropdown
+- **Refactored DocumentEditor Component**: Broke down the large monolithic DocumentEditor component into smaller, more maintainable pieces:
+  - Created a modular directory structure with separate components, hooks, and utilities
+  - Extracted UI components (DocumentHeader, EditorToolbar, SuggestionsPanel)
+  - Created custom hooks (useSlateEditor, useAutoSave, useSuggestions)
+  - Separated utility functions (slateUtils)
+- **Fixed Chat Panel JSON Display Issue**: Resolved issue with raw JSON being displayed in the chat panel
+  - Added markdown code block parsing in both frontend and backend
+  - Enhanced error handling for different response formats
+- **Fixed Suggestion Application**: Resolved issue with the "Accept" button not working for suggestions
+  - Added proper state updates after editor transformations
+  - Ensured React re-renders after Slate editor content changes
 
 ### Backend
+- **Enhanced AI Response Handling**: Improved handling of LLM responses
+  - Added support for markdown-formatted JSON responses
+  - Implemented better error handling and fallback mechanisms
+  - Added detailed logging for debugging
 - Set up FastAPI server with RESTful endpoints
 - Implemented document CRUD operations
 - Created chat history endpoints
 - Integrated LangChain and LangGraph with OpenRouter API for real LLM model integration
-- Added support for multiple LLM models (Claude 3.7 Sonnet and GPT-4.1)
+- Added support for multiple LLM models (Claude 3.7 Sonnet and GPT-4o Mini)
 - Implemented in-memory storage for documents and chat history
 - Added environment variable configuration for API keys
 
 ## Next Steps
 
 ### Short-term Tasks
-1. **Implement Real-time Collaboration**: Add WebSocket support for real-time document updates between multiple users
-2. **Enhance AI Suggestions**: Improve the AI suggestion system to provide more relevant and helpful suggestions
-3. **User Authentication**: Add user authentication and authorization
-4. **UI Improvements**: Enhance the user interface with better styling and user experience
-5. **Add More LLM Models**: Expand the available models in the dropdown menu
+1. **Continue Code Refactoring**: Further improve code organization and maintainability
+   - Consider extracting more components from large files
+   - Add comprehensive error handling
+   - Improve TypeScript type definitions
+2. **Implement Real-time Collaboration**: Add WebSocket support for real-time document updates between multiple users
+3. **Enhance AI Suggestions**: Improve the AI suggestion system to provide more relevant and helpful suggestions
+4. **User Authentication**: Add user authentication and authorization
+5. **UI Improvements**: Enhance the user interface with better styling and user experience
 
 ### Medium-term Tasks
 1. **Database Integration**: Replace in-memory storage with a proper database
@@ -46,11 +58,12 @@ The Collaborative Editor project is currently focused on implementing the core f
 ## Active Decisions and Considerations
 
 ### Technical Decisions
-1. **State Management**: Using React Query for server state management instead of Redux or other global state management libraries to reduce complexity
-2. **Editor Framework**: Chose Slate.js over other rich text editors (Draft.js, Quill.js) for its flexibility and extensibility
-3. **AI Integration**: Using LangChain and LangGraph with OpenRouter API for AI assistant functionality to leverage real LLM models
-4. **LLM Provider**: Using OpenRouter API to access multiple LLM models through a single API
-5. **Storage Strategy**: Currently using in-memory storage for simplicity, but designed with future database integration in mind
+1. **Component Architecture**: Adopted a more modular component architecture with smaller, focused components and custom hooks
+2. **State Management**: Using React Query for server state management instead of Redux or other global state management libraries to reduce complexity
+3. **Editor Framework**: Chose Slate.js over other rich text editors (Draft.js, Quill.js) for its flexibility and extensibility
+4. **AI Integration**: Using LangChain and LangGraph with OpenRouter API for AI assistant functionality to leverage real LLM models
+5. **LLM Provider**: Using OpenRouter API to access multiple LLM models through a single API
+6. **Storage Strategy**: Currently using in-memory storage for simplicity, but designed with future database integration in mind
 
 ### UX Decisions
 1. **Layout Design**: Split-screen layout with document editor and chat panel side by side for seamless interaction
@@ -62,7 +75,9 @@ The Collaborative Editor project is currently focused on implementing the core f
 ## Important Patterns and Preferences
 
 ### Code Organization
-- Frontend components are organized by feature
+- Frontend components are organized by feature and responsibility
+- Components are broken down into smaller, more focused pieces
+- Custom hooks are used to encapsulate and reuse stateful logic
 - Backend code follows a service-oriented architecture
 - API endpoints are RESTful and follow consistent naming conventions
 - TypeScript interfaces are used for type safety across the application
@@ -82,6 +97,9 @@ The Collaborative Editor project is currently focused on implementing the core f
 
 ### Technical Insights
 - Slate.js has a steep learning curve but offers great flexibility for custom editor features
+- Breaking down large components into smaller pieces improves maintainability and readability
+- Custom hooks are powerful for encapsulating and reusing stateful logic
+- Explicit state updates are necessary when modifying Slate editor content
 - LangChain and LangGraph provide a structured way to work with language models
 - OpenRouter API simplifies integration with multiple LLM providers
 - React Query simplifies data fetching and caching, reducing the need for manual state management
@@ -94,6 +112,8 @@ The Collaborative Editor project is currently focused on implementing the core f
 - Ensuring good performance with potentially large documents
 - Managing API keys securely for LLM integration
 - Handling different response formats from various LLM models
+- Debugging issues in complex component hierarchies
+- Ensuring proper state updates in React components with external libraries
 
 ### Opportunities
 - The AI assistant could be extended to provide more advanced writing assistance

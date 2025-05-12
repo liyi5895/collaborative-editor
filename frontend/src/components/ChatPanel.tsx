@@ -119,10 +119,38 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ documentId, isCreatingNew = false
           queryClient.setQueryData(['chatHistory', documentId], [...currentHistory, userMessage, aiMessage]);
         }
         
-        // Pass suggestions to parent component
+        // Validate suggestions before passing them to parent component
         if (onNewSuggestions && suggestions.length > 0) {
-          console.log("Passing suggestions to parent:", suggestions);
-          onNewSuggestions(suggestions);
+          console.log("Validating suggestions before passing to parent:", suggestions);
+          
+          // Filter out invalid suggestions
+          const validatedSuggestions = suggestions.filter(suggestion => {
+            // Always allow replace_all suggestions
+            if (suggestion.type === 'replace_all' || suggestion.type === 'replace all') {
+              return true;
+            }
+            
+            // For other suggestion types, validate block_index
+            if (typeof suggestion.block_index !== 'number') {
+              console.error("Skipping suggestion without block_index:", suggestion);
+              return false;
+            }
+            
+            // Ensure block_index is a non-negative integer
+            if (suggestion.block_index < 0 || !Number.isInteger(suggestion.block_index)) {
+              console.error(`Skipping suggestion with invalid block_index ${suggestion.block_index}:`, suggestion);
+              return false;
+            }
+            
+            return true;
+          });
+          
+          console.log(`Filtered ${suggestions.length - validatedSuggestions.length} invalid suggestions`);
+          console.log("Passing validated suggestions to parent:", validatedSuggestions);
+          
+          if (validatedSuggestions.length > 0) {
+            onNewSuggestions(validatedSuggestions);
+          }
         }
       } catch (error) {
         console.error("Error processing AI response:", error);

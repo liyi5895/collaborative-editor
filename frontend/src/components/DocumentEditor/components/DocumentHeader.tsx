@@ -2,6 +2,7 @@ import React from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createDocument } from '../../../services/api';
 import { Document } from '../../../types';
+import { serializeWithBlockIds } from '../utils/slateUtils';
 
 interface DocumentHeaderProps {
   document: Document | null;
@@ -42,7 +43,15 @@ const DocumentHeader: React.FC<DocumentHeaderProps> = ({
       return;
     }
     
-    createDocumentMutation.mutate({ title, content: '' });
+    // Create an empty document with block IDs
+    const emptyContent = serializeWithBlockIds([
+      {
+        type: 'paragraph',
+        children: [{ text: '' }]
+      }
+    ]);
+    
+    createDocumentMutation.mutate({ title, content: emptyContent });
   };
 
   return (

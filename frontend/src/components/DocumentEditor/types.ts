@@ -16,6 +16,7 @@ declare module 'slate' {
 export interface CustomElement extends BaseElement {
   type: 'paragraph' | 'heading-one' | 'heading-two' | 'heading-three' | 'bulleted-list' | 'numbered-list' | 'list-item';
   children: CustomText[];
+  blockId?: number;  // Make optional for backward compatibility
 }
 
 // Define custom text type
@@ -29,6 +30,11 @@ export interface CustomText extends BaseText {
     type: string;
     id: string;
   };
+}
+
+// Add or update types
+export interface BlockNode extends CustomElement {
+  blockId: number;
 }
 
 // Props for the main DocumentEditor component

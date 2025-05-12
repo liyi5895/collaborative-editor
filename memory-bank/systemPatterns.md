@@ -26,7 +26,33 @@ The frontend follows a component-based architecture using React with TypeScript:
                         ┌─────┴─────┐
                 ┌───────▼───┐     ┌─▼──────────┐
                 │DocumentEditor│     │ ChatPanel │
-                └───────────┘     └────────────┘
+                └───────┬─────┘     └────────────┘
+                        │
+        ┌───────────────┼───────────────┐
+        │               │               │
+┌───────▼──────┐ ┌──────▼─────┐ ┌───────▼────────┐
+│DocumentHeader│ │EditorToolbar│ │SuggestionsPanel│
+└──────────────┘ └────────────┘ └────────────────┘
+```
+
+#### DocumentEditor Component Structure
+
+After refactoring, the DocumentEditor component has been broken down into a modular structure:
+
+```
+DocumentEditor/
+├── index.tsx                 # Main component
+├── types.ts                  # Shared types
+├── components/               # UI components
+│   ├── DocumentHeader.tsx    # Title and document controls
+│   ├── EditorToolbar.tsx     # Formatting toolbar
+│   └── SuggestionsPanel.tsx  # Suggestions UI
+├── hooks/                    # Custom hooks
+│   ├── useAutoSave.ts        # Auto-save functionality
+│   ├── useSlateEditor.tsx    # Editor configuration
+│   └── useSuggestions.ts     # Suggestion processing
+└── utils/                    # Utility functions
+    └── slateUtils.ts         # Serialization helpers
 ```
 
 ### Backend Architecture
@@ -83,19 +109,25 @@ The application uses Slate.js for rich text editing, which provides:
 
 ### 1. Component Composition
 
-React components are structured using composition, with smaller, focused components combined to create more complex UI elements.
+React components are structured using composition, with smaller, focused components combined to create more complex UI elements. The refactored DocumentEditor is a prime example, composed of several smaller components:
+- DocumentHeader for title and controls
+- EditorToolbar for formatting options
+- SuggestionsPanel for AI suggestions
+- Slate editor components for the main editing area
 
 ### 2. Container/Presentational Pattern
 
 - Container components handle data fetching and state management
 - Presentational components focus on rendering UI based on props
+- For example, the main DocumentEditor component acts as a container, while components like EditorToolbar are presentational
 
 ### 3. Custom Hooks
 
-Custom hooks encapsulate and reuse stateful logic across components, such as:
-- Document editing functionality
-- Chat interactions
-- AI suggestion handling
+Custom hooks encapsulate and reuse stateful logic across components:
+- **useSlateEditor**: Manages editor configuration and formatting
+- **useAutoSave**: Handles automatic document saving
+- **useSuggestions**: Processes and applies AI suggestions
+- These hooks separate logic from UI components, improving maintainability
 
 ### 4. Render Props and Higher-Order Components
 
@@ -113,25 +145,47 @@ Backend functionality is organized into service modules that handle specific asp
 ### Document Editor Flow
 
 ```
-User Input → DocumentEditor → API Service → Backend → Database
+User Input → DocumentEditor → Custom Hooks → Slate Editor → UI Updates
+                   ↓                ↓
+              API Service      State Updates
                    ↓
-              UI Updates
+                Backend
                    ↓
-           Document Rendering
+               Database
+```
+
+### Document Editor Component Interaction
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                     DocumentEditor                      │
+│                                                         │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────┐  │
+│  │useSlateEditor│  │ useAutoSave │  │ useSuggestions  │  │
+│  └──────┬──────┘  └──────┬──────┘  └────────┬────────┘  │
+│         │                │                  │           │
+│  ┌──────▼──────┐  ┌──────▼──────┐  ┌────────▼────────┐  │
+│  │EditorToolbar│  │Slate Editor │  │SuggestionsPanel │  │
+│  └─────────────┘  └─────────────┘  └─────────────────┘  │
+└─────────────────────────────────────────────────────────┘
 ```
 
 ### AI Assistant Flow
 
 ```
 User Message → ChatPanel → API Service → Backend → AI Service
-                                                      ↓
-                                                LangChain/LangGraph
-                                                      ↓
-                                                 AI Response
-                                                      ↓
-                                                  ChatPanel
-                                                      ↓
-                                              Document Suggestions
+                  ↓                                   ↓
+        Response Parsing                       LangChain/LangGraph
+                  ↓                                   ↓
+          Display Message                        AI Response
+                  ↓                                   ↓
+        Extract Suggestions                  Format as JSON/Markdown
+                  ↓                                   ↓
+      Pass to DocumentEditor                Return to Frontend
+                  ↓
+        useSuggestions Hook
+                  ↓
+        SuggestionsPanel UI
 ```
 
 ### Document Versioning Flow
@@ -149,22 +203,37 @@ Document Update → API Service → Backend → Version Creation
 ### 1. Real-time Document Editing
 
 - User edits document in the Slate.js editor
-- Changes are tracked in component state
-- Auto-save functionality sends updates to the backend
+- Changes are tracked in component state via the Slate onChange handler
+- useAutoSave hook detects changes and schedules auto-save
+- After a delay, changes are sent to the backend via API service
 - Document versions are created on the backend
 
 ### 2. AI Assistance
 
 - User sends a message through the chat interface
-- Message is sent to the backend API
+- Message is sent to the backend API with selected model
 - Backend processes the message using LangChain and LangGraph
-- AI generates a response and document suggestions
+- AI generates a response and document suggestions (potentially in markdown format)
+- Backend parses and formats the response
 - Response and suggestions are returned to the frontend
-- Suggestions are displayed in the UI for user acceptance/rejection
+- ChatPanel component parses the response and extracts suggestions
+- Suggestions are passed to the DocumentEditor component
+- useSuggestions hook processes the suggestions
+- SuggestionsPanel displays suggestions for user acceptance/rejection
 
 ### 3. Document Management
 
 - Documents are listed in the DocumentList component
 - Selecting a document loads it in the DocumentEditor
 - Creating a new document initializes a blank editor
+- DocumentHeader component handles document title and save functionality
 - Saving updates the document on the backend
+
+### 4. Suggestion Application
+
+- User clicks "Accept" on a suggestion in the SuggestionsPanel
+- SuggestionsPanel calls the applySuggestion function from useSuggestions hook
+- useSuggestions determines the type of suggestion (addition, deletion, modification, replace_all)
+- Appropriate Slate Transforms are applied to modify the editor content
+- setValue is called to update React state and trigger re-rendering
+- The suggestion is removed from the active suggestions list

@@ -3,12 +3,13 @@ from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.messages import HumanMessage, AIMessage
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from langgraph.graph import StateGraph, END
 import os
 import json
 import requests
 from dotenv import load_dotenv
+import re
 
 # Load environment variables
 load_dotenv()
@@ -24,6 +25,38 @@ AVAILABLE_MODELS = {
 
 # Default model
 DEFAULT_MODEL = "claude-3.7-sonnet"
+
+SYSTEM_PROMPT = """You are an AI assistant helping with a document. 
+Analyze the document content and provide helpful responses.
+
+IMPORTANT: Only suggest changes that are EXPLICITLY requested by the user. Do not add additional suggestions unless specifically asked.
+
+Your response should be in JSON format with a 'message' field and a 'suggestions' field.
+
+Each suggestion should have:
+- 'type': "addition", "deletion", "modification", or "replace_all"
+- 'block_index': The index of the block to modify (as shown in [])
+- 'content': The text to add, delete, or use as replacement
+- 'reason': Why you're suggesting this change
+
+CRITICAL RULES FOR BLOCK INDICES:
+1. Block indices are ZERO-BASED - the first block has index 0, the second has index 1, etc.
+2. Block indices MUST match exactly the numbers shown in square brackets [n] at the beginning of each line
+3. Block indices must be less than the total number of blocks
+4. Double-check all block indices before returning them
+5. If you're unsure about a block index, do not include that suggestion
+6. Never invent or estimate block indices - use only the exact indices shown in the document
+
+EXAMPLES:
+- If you want to modify the first block (with [0] prefix), use block_index: 0
+- If you want to modify the second block (with [1] prefix), use block_index: 1
+
+IMPORTANT FOR NEW OR MINIMAL DOCUMENTS:
+For new or minimal documents (e.g., documents with just a placeholder or empty content),
+ALWAYS use type: "replace_all" instead of trying to modify specific blocks. This ensures
+the entire document is replaced with your suggested content and avoids block index issues.
+
+For complete document rewrites, use type: "replace_all" instead of a block_index."""
 
 # Define the state for the LangGraph
 class DocumentAssistantState(BaseModel):
@@ -44,6 +77,14 @@ class AIAssistantResponse(BaseModel):
     message: str = Field(description="The AI assistant's response to the user's query")
     suggestions: List[DocumentSuggestion] = Field(description="List of suggested changes to the document")
 
+def create_error_response(message: str, error: Optional[Exception] = None) -> Dict[str, Any]:
+    """Create a standardized error response"""
+    error_msg = f"{message}: {str(error)}" if error else message
+    return {
+        "message": error_msg,
+        "suggestions": []
+    }
+
 def call_openrouter_api(prompt: str, model: str = DEFAULT_MODEL) -> Dict[str, Any]:
     """
     Call the OpenRouter API to get a response from the specified LLM model.
@@ -56,7 +97,7 @@ def call_openrouter_api(prompt: str, model: str = DEFAULT_MODEL) -> Dict[str, An
         Dict containing the LLM response
     """
     if not OPENROUTER_API_KEY:
-        raise ValueError("OpenRouter API key not found. Please set the OPENROUTER_API_KEY environment variable.")
+        return create_error_response("OpenRouter API key not found. Please set the OPENROUTER_API_KEY environment variable.")
     
     # Get the full model identifier from the available models
     model_id = AVAILABLE_MODELS.get(model, AVAILABLE_MODELS[DEFAULT_MODEL])
@@ -72,18 +113,7 @@ def call_openrouter_api(prompt: str, model: str = DEFAULT_MODEL) -> Dict[str, An
         "messages": [
             {
                 "role": "system",
-                "content": """You are an AI assistant helping with a document. 
-                Analyze the document content and provide helpful responses.
-                Also suggest changes to improve the document.
-                Your response should be in JSON format with a 'message' field and a 'suggestions' field.
-                
-                Each suggestion should have:
-                - 'type': "addition", "deletion", "modification", or "replace_all"
-                - 'block_index': The index of the block to modify (as shown in [])
-                - 'content': The text to add, delete, or use as replacement
-                - 'reason': Why you're suggesting this change
-                
-                For complete document rewrites, use type: "replace_all" instead of a block_index."""
+                "content": SYSTEM_PROMPT
             },
             {
                 "role": "user",
@@ -121,45 +151,57 @@ def call_openrouter_api(prompt: str, model: str = DEFAULT_MODEL) -> Dict[str, An
             
             # Parse the JSON content
             try:
-                print(f"Parsing OpenRouter API response content: {content_to_parse}")
                 parsed_content = json.loads(content_to_parse)
-                print(f"Parsed content: {parsed_content}")
                 return parsed_content
             except json.JSONDecodeError as e:
-                # If the response is not valid JSON, create a fallback response
-                print(f"JSON decode error: {e}")
                 print(f"Raw content: {content}")
                 
                 # Try to extract message from the content if it's markdown-formatted
-                if "message" in content and "suggestions" in content:
-                    try:
-                        # Simple extraction of message value using string manipulation
-                        message_start = content.find('"message"') + 10  # 10 = len('"message":')
-                        message_start = content.find('"', message_start) + 1
-                        message_end = content.find('"', message_start)
-                        extracted_message = content[message_start:message_end]
-                        return {
-                            "message": extracted_message,
-                            "suggestions": []
-                        }
-                    except Exception as ex:
-                        print(f"Error extracting message: {ex}")
+                # if "message" in content and "suggestions" in content:
+                #     try:
+                #         # Simple extraction of message value using string manipulation
+                #         message_start = content.find('"message"') + 10  # 10 = len('"message":')
+                #         message_start = content.find('"', message_start) + 1
+                #         message_end = content.find('"', message_start)
+                #         extracted_message = content[message_start:message_end]
+                #         return {
+                #             "message": extracted_message,
+                #             "suggestions": []
+                #         }
+                #     except Exception as ex:
+                #         print(f"Error extracting message: {ex}")
                 
-                return {
-                    "message": "I'm sorry, I couldn't process your request properly. Please try again.",
-                    "suggestions": []
-                }
+                return create_error_response("I'm sorry, a JSON decode error occurred", e)
         else:
-            return {
-                "message": "I'm sorry, I couldn't process your request.",
-                "suggestions": []
-            }
+            return create_error_response("I'm sorry, the response is malformed. Please try again")
     except Exception as e:
         print(f"Error calling OpenRouter API: {str(e)}")
-        return {
-            "message": f"I'm sorry, there was an error processing your request: {str(e)}",
-            "suggestions": []
-        }
+        return create_error_response("I'm sorry, there was an error processing your request", e)
+
+def parse_document_blocks(document_content: str) -> Tuple[List[str], Dict[int, int]]:
+    """Parse document content into blocks and their indices"""
+    document_lines = []
+    block_indices = {}
+    
+    print("Parsing document content:", document_content)  # Debug log
+    
+    lines = document_content.split('\n')
+    for line in lines:
+        match = re.match(r'\[BLOCK:(\d+)\](.*)', line)
+        if match:
+            block_id = int(match.group(1))
+            content = match.group(2)
+            block_indices[len(document_lines)] = block_id
+            document_lines.append(content)
+            print(f"Found block {block_id} at index {len(document_lines)-1}")  # Debug log
+        else:
+            # Log when we find a line without a block ID
+            print(f"Warning: Line without block ID: {line}")  # Debug log
+            document_lines.append(line)
+            
+    print("Final block_indices:", block_indices)  # Debug log
+    print("Number of document lines:", len(document_lines))  # Debug log
+    return document_lines, block_indices
 
 # Create a function to generate AI responses
 def generate_response(state: DocumentAssistantState):
@@ -171,10 +213,16 @@ def generate_response(state: DocumentAssistantState):
         content = message.get("content", "")
         formatted_history += f"{role.upper()}: {content}\n"
     
-    # Format document with block indices
-    document_lines = state.document_content.split('\n')
-    formatted_document = "\n".join([f"[{i}] {line}" for i, line in enumerate(document_lines)])
-    
+    # Parse document with block IDs
+    document_lines, block_indices = parse_document_blocks(state.document_content)
+
+    # Format document with block indices, handling missing indices
+    formatted_document = ""
+    for i, line in enumerate(document_lines):
+        # Use get() with a fallback to the line index if no block ID exists
+        block_id = block_indices.get(i, i)
+        formatted_document += f"[{block_id}] {line}\n"
+
     # Create the prompt for the LLM
     prompt = f"""
         DOCUMENT CONTENT (with block indices):
@@ -187,15 +235,8 @@ def generate_response(state: DocumentAssistantState):
         {state.current_query}
 
         Based on the document content and the user's query, provide a helpful response.
-        Also suggest any changes to the document that might improve it.
         
-        For any suggested changes, specify:
-        - type: "addition", "deletion", "modification", or "replace_all"
-        - block_index: The index of the block to modify (as shown in [])
-        - content: The text to add, delete, or use as replacement
-        - reason: Why you're suggesting this change
-        
-        For complete document rewrites, use type: "replace_all" instead of a block_index.
+        {SYSTEM_PROMPT}
     """
     
     # Get the model from the state if available, otherwise use the default
@@ -228,6 +269,37 @@ def create_document_assistant_graph():
     # Compile the graph
     return workflow.compile()
 
+def validate_suggestions(suggestions: List[Dict[str, Any]], total_blocks: int) -> List[Dict[str, Any]]:
+    """Validate suggestions against document structure"""
+    validated_suggestions = []
+    
+    print(f"Validating suggestions against document with {total_blocks} blocks")
+    
+    for suggestion in suggestions:
+        # Always allow replace_all suggestions
+        if suggestion.get('type') in ['replace_all', 'replace all']:
+            validated_suggestions.append(suggestion)
+            continue
+            
+        # Get the block index
+        block_index = suggestion.get('block_index')
+        
+        # Skip suggestions without a block index
+        if block_index is None:
+            print(f"Skipping suggestion without block_index: {suggestion}")
+            continue
+            
+        # Validate that block_index is a non-negative integer within range
+        if not isinstance(block_index, int) or block_index < 0 or block_index >= total_blocks:
+            print(f"Invalid block_index {block_index} (must be 0-{total_blocks-1}): {suggestion}")
+            continue
+            
+        # Add valid suggestion to the list
+        validated_suggestions.append(suggestion)
+    
+    print(f"Filtered {len(suggestions) - len(validated_suggestions)} invalid suggestions")
+    return validated_suggestions
+
 # Function to process a user query
 def process_query(document_content: str, chat_history: List[Dict[str, Any]], query: str, model: str = DEFAULT_MODEL) -> Dict[str, Any]:
     """
@@ -259,17 +331,18 @@ def process_query(document_content: str, chat_history: List[Dict[str, Any]], que
     # Extract the final state from the result dictionary
     # The key should be the name of the last node executed, which is 'generate_response'
     try:
-        response = {
-            "message": result["response"],
-            "suggestions": result["suggestions"]
+        message = result["response"]
+        suggestions = result["suggestions"]
+        
+        # Use the same block parsing logic as generate_response
+        document_lines, _ = parse_document_blocks(document_content)
+        validated_suggestions = validate_suggestions(suggestions, len(document_lines))
+        
+        return {
+            "message": message,
+            "suggestions": validated_suggestions
         }
-        print(f"Returning AI response: {response}")
-        return response
     except Exception as e:
-        # Fallback in case the result structure is different
         print(f"Error extracting result: {e}")
         print(f"Unexpected result structure: {result}")
-        return {
-            "message": "I'm sorry, I couldn't process your request.",
-            "suggestions": []
-        }
+        return create_error_response("I'm sorry, I couldn't process your request")

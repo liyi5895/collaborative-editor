@@ -47,14 +47,14 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     isMarkActive 
   } = useSlateEditor();
   
-  const { isSaving } = useAutoSave(document?.id, value, isCreatingNew);
+  const { isAutoSaving } = useAutoSave(document?.id, value, isCreatingNew);
   
   const { 
     activeSuggestions, 
     documentReplacementSuggestion, 
     applySuggestion, 
     rejectSuggestion 
-  } = useSuggestions(editor, suggestions, onSuggestionApplied);
+  } = useSuggestions(editor, suggestions, setValue, onSuggestionApplied);
 
   // Update title when document changes
   useEffect(() => {
@@ -111,7 +111,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
         rejectSuggestion={rejectSuggestion}
       />
       
-      {!isCreatingNew && isSaving && (
+      {!isCreatingNew && isAutoSaving && (
         <div className="auto-save-indicator">Saving...</div>
       )}
     </div>
